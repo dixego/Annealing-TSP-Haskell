@@ -4,6 +4,7 @@ module Annealer where
 import System.Random
 import Data.List (find, iterate')
 import Data.Maybe (fromMaybe, fromJust)
+--import Debug.Trace (trace)
 
 type Cost = Double
 
@@ -92,18 +93,19 @@ withInitialTemperature an@(Annealer { rng, acceptedRate, initialTemperature, ini
 thresholdAccepting :: Solution s => Annealer s -> [s]
 thresholdAccepting annealer@(Annealer { rng, batchSize, coolingRate, minTemperature, 
       initialTemperature, initialSolution }) 
-  = step rng initialSolution [initialSolution] initialTemperature
+  = step rng initialSolution [initialSolution] 0 initialTemperature 
   where
-    step rng solution bests temp = 
-      if temp < minTemperature 
-         then bests
-         else let 
-              (rng', lastSolution, best) = tempStep 0 1e1000 rng solution (head bests) temp in
-                  step rng' lastSolution (best:bests) (coolingRate * temp)
 
-    tempStep p q rng sol best temp
-      | p > q = (rng', last, best')
-      | otherwise = tempStep p' p rng' last best' temp
+    step rng solution bests avgCost temp
+      | temp < minTemperature = bests
+      | otherwise = step rng' lastSolution (best:bests) avgCost' (coolingRate * temp) 
+      where 
+        (rng', lastSolution, best, avgCost') = 
+          tempStep avgCost 1e1000 rng solution (head bests) temp batchSize
+
+    tempStep p q rng sol best temp fuel
+      | fuel == 0 || p > q = (rng', last, best', p')
+      | otherwise = tempStep p' p rng' last best' temp (fuel-1)
       where 
         BatchResult{batchRng, finalSolution, bestSolution, avgCost} = 
           mkBatch rng sol batchSize temp
